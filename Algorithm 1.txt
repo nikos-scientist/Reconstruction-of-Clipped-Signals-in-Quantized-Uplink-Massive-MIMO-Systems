@@ -1,0 +1,84 @@
+function [y_hat,y_iter,CLI]= iterative_suboptimal(H, F, y_, c,Cx,Cw,iter)
+
+%H:  effective channel after ACG (i.e. H_eff = sqrt(pu)*F*H;  )
+%F:  AGC per antenna (diagonal matrix)
+%y_: Received signal after quantization 
+% c: Clipping value 
+%Cx: Covariance matrix of x (or h)
+%Cw: Covariance matrix of AWGN
+%iter: Max number of iterations
+
+
+[N,K] = size(H);
+
+y_hat = y_;
+y_iter = zeros(iter,length(y_));
+
+f = diag(F);
+
+not_cli = abs(y_) < c ;
+cli = not(not_cli);
+I = find(cli);
+
+% y_hat(I) = zeros(1,length(I));
+
+CLI = sum(cli);
+
+
+for k = 1 : iter
+    
+    temp = zeros(1,CLI);
+
+    for i = 1 : CLI
+    
+        q = [1:I(i)-1 (I(i)+1):N];
+    
+        % The effective channel is reformed such that the clipped samples
+        % come first
+        H_ = [ H(I(i),:) ; H(q,:) ]; 
+        f_ = [f(I(i)); f(q)];
+        F  = diag(f_);
+        
+        C = H_*Cx*H_' + F*Cw*F';
+        
+        C11 = C(1,1);
+        C12 = C(1, 2:end);
+        C21 = C(2:end, 1);
+        C22 = C(2:end, 2:end);
+    
+        A = C12*C22^(-1);
+
+        mu = A*y_hat(q); % eq 15
+        v = C11 - A*C21; % eq 16
+
+        if y_(I(i)) >=  c
+            
+            Q = (1-normcdf((c-mu)/sqrt(v))  );
+            if Q == 0 % Avoid division with 0
+                temp(i) = c; % Set the estimated value to the clipping value 
+            else
+                temp(i) = mu + sqrt(v)*phi( (c-mu)/sqrt(v) )/Q;
+            end
+        
+        elseif y_(I(i)) <= -c
+            
+            Q = ( normcdf((-c-mu)/sqrt(v)) );
+            if Q == 0
+                temp(i) = -c; 
+            else
+                temp(i) = mu - sqrt(v)*phi( (-c-mu)/sqrt(v) )/Q;
+            end
+        end
+
+        y_hat(I(i)) = temp(i);
+       
+      
+    end
+    
+    if CLI > 0
+          y_iter(k,:) = y_hat;
+    end
+      
+
+end
+
