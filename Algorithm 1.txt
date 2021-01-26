@@ -48,8 +48,8 @@ for k = 1 : iter
     
         A = C12*C22^(-1);
 
-        mu = A*y_hat(q); % eq 15
-        v = C11 - A*C21; % eq 16
+        mu = A*y_hat(q); % eq 18
+        v = C11 - A*C21; % eq 19
 
         if y_(I(i)) >=  c
             
